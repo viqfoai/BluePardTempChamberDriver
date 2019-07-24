@@ -1,0 +1,76 @@
+1: add code to prevent temp stage surpass 29
+    original code:
+                if (hTempChamber->wOldRemainingTime < hTempChamber->wRemainingTime)
+                {
+                  hTempChamber->dwPresentStage++;								//每次剩余时间变多时，表示温箱进入下一阶段
+                }
+
+    new code:
+                if (hTempChamber->wOldRemainingTime < hTempChamber->wRemainingTime\
+                  && hTempChamber->dwPresentStage < MAX_STAGE_NUMBER)		//需要防止dwPresentStage超过29 19/7/8
+                {
+                  hTempChamber->dwPresentStage++;								//每次剩余时间变多时，表示温箱进入下一阶段
+                }
+                else
+                {
+                  if (hTempChamber->dwPresentStage >= MAX_STAGE_NUMBER)
+                    break;
+                }
+
+2: added debug information:
+	if (!pReadData)
+	{
+#ifdef RELEASE_DEBUG
+		DbgPrint("BMW: Read Chamber Data Fail\n");
+#endif // RELEASE_DEBUG
+		return S_FALSE;
+	}
+ from line #599
+ 
+ 3: add temp stage control in function DllSetTemperature
+ original code:
+ 	if (iTemperature > MAX_TEMP || iTemperature < MIN_TEMP || iMinTime > MAX_TIME)
+		return ERROR_INVALID_PARAMETER;
+
+	((HTCHAMBER)hTempChamber)->dwTempChamberStatus |= TC_STATUS_TEMPERATURE_SET;
+
+	((HTCHAMBER)hTempChamber)->wSetTemp = (WORD)(iTemperature * 10);
+	((HTCHAMBER)hTempChamber)->wMinStageTime = (WORD)iMinTime;
+
+	i = ((HTCHAMBER)hTempChamber)->dwPresentStage + 1;
+
+	((HTCHAMBER)hTempChamber)->StageData[i].wTemp = ((HTCHAMBER)hTempChamber)->wSetTemp;
+	((HTCHAMBER)hTempChamber)->StageData[i].wTime = INITIAL_TIME;
+
+	for(int i = ((HTCHAMBER)hTempChamber)->dwPresentStage + 2; i < MAX_STAGE_NUMBER; i++)
+	{
+		((HTCHAMBER)hTempChamber)->StageData[i].wTemp = ((HTCHAMBER)hTempChamber)->wSetTemp;
+		((HTCHAMBER)hTempChamber)->StageData[i].wTime = ((HTCHAMBER)hTempChamber)->wMinStageTime;
+	}
+
+new code:
+	if (iTemperature > MAX_TEMP \
+		|| iTemperature < MIN_TEMP \
+		|| iMinTime > MAX_TIME \
+		|| ((HTCHAMBER)hTempChamber)->dwPresentStage >= MAX_STAGE_NUMBER - 2)
+		return ERROR_INVALID_PARAMETER;					//modified in 19/07/08
+
+	((HTCHAMBER)hTempChamber)->dwTempChamberStatus |= TC_STATUS_TEMPERATURE_SET;
+
+	((HTCHAMBER)hTempChamber)->wSetTemp = (WORD)(iTemperature * 10);
+	((HTCHAMBER)hTempChamber)->wMinStageTime = (WORD)iMinTime;
+
+	i = ((HTCHAMBER)hTempChamber)->dwPresentStage + 1;
+
+	((HTCHAMBER)hTempChamber)->StageData[i].wTemp = ((HTCHAMBER)hTempChamber)->wSetTemp;
+	((HTCHAMBER)hTempChamber)->StageData[i].wTime = INITIAL_TIME;
+
+	for(int i = ((HTCHAMBER)hTempChamber)->dwPresentStage + 2; i < MAX_STAGE_NUMBER; i++)
+	{
+		((HTCHAMBER)hTempChamber)->StageData[i].wTemp = ((HTCHAMBER)hTempChamber)->wSetTemp;
+		((HTCHAMBER)hTempChamber)->StageData[i].wTime = ((HTCHAMBER)hTempChamber)->wMinStageTime;
+	}
+
+	((HTCHAMBER)hTempChamber)->StageData[MAX_STAGE_NUMBER].wTemp = ((HTCHAMBER)hTempChamber)->wSetTemp;	//modified in 19/07/08
+	((HTCHAMBER)hTempChamber)->StageData[MAX_STAGE_NUMBER].wTime = MAX_TIME;							//modified in 19/07/08
+
